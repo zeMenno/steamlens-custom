@@ -38,6 +38,22 @@ export function MediaCarousel({ screenshots, movies, gameName }: MediaCarouselPr
     })) || []),
   ];
 
+  // Keyboard navigation - must be called before any early returns
+  useEffect(() => {
+    if (mediaItems.length === 0) return;
+    
+    const handleKeyPress = (e: KeyboardEvent) => {
+      if (e.key === "ArrowLeft") {
+        setCurrentIndex((prev) => (prev === 0 ? mediaItems.length - 1 : prev - 1));
+      } else if (e.key === "ArrowRight") {
+        setCurrentIndex((prev) => (prev === mediaItems.length - 1 ? 0 : prev + 1));
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyPress);
+    return () => window.removeEventListener("keydown", handleKeyPress);
+  }, [mediaItems.length]);
+
   if (mediaItems.length === 0) {
     return null;
   }
@@ -53,20 +69,6 @@ export function MediaCarousel({ screenshots, movies, gameName }: MediaCarouselPr
   const goToSlide = (index: number) => {
     setCurrentIndex(index);
   };
-
-  // Keyboard navigation
-  useEffect(() => {
-    const handleKeyPress = (e: KeyboardEvent) => {
-      if (e.key === "ArrowLeft") {
-        setCurrentIndex((prev) => (prev === 0 ? mediaItems.length - 1 : prev - 1));
-      } else if (e.key === "ArrowRight") {
-        setCurrentIndex((prev) => (prev === mediaItems.length - 1 ? 0 : prev + 1));
-      }
-    };
-
-    window.addEventListener("keydown", handleKeyPress);
-    return () => window.removeEventListener("keydown", handleKeyPress);
-  }, [mediaItems.length]);
 
   const currentItem = mediaItems[currentIndex];
 
