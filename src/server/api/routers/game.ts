@@ -9,9 +9,11 @@ import {
   getGamesByGenre,
   getFreeGames,
   getGamesOnSale,
+  getGamesByPriceRange,
   SearchFilters
 } from "../services/steam";
 import { searchHLTB } from "../services/howlongtobeat";
+import { getGeneralGameRecommendations } from "../services/groq";
 
 const searchFiltersSchema = z.object({
   excludeNSFW: z.boolean().optional(),
@@ -95,6 +97,52 @@ export const gameRouter = createTRPCRouter({
     .query(async ({ input }) => {
       const games = await getGamesOnSale(input?.filters as SearchFilters);
       return games;
+    }),
+
+  getGamesByPriceRange: publicProcedure
+    .input(z.object({ 
+      minPrice: z.number().optional(),
+      maxPrice: z.number().optional(),
+      filters: searchFiltersSchema.optional(),
+    }))
+    .query(async ({ input }) => {
+      const games = await getGamesByPriceRange(
+        input.minPrice,
+        input.maxPrice,
+        input.filters as SearchFilters
+      );
+      return games;
+    }),
+
+  getAIRecommendedGames: publicProcedure
+    .query(async () => {
+      // Get a pool of popular games to recommend from
+      const trendingGames = await getTrendingGames();
+      const newReleases = await getNewReleases();
+      const freeGames = await getFreeGames();
+      
+      // Combine and deduplicate
+      const allGames = [
+        ...trendingGames,
+        ...newReleases,
+        ...freeGames,
+      ];
+      
+      const uniqueGames = Array.from(
+        new Map(allGames.map(game => [game.appid, game])).values()
+      );
+
+      // Get AI recommendations
+      const gameList = uniqueGames.map(g => ({ appid: g.appid, name: g.name }));
+      const recommendations = await getGeneralGameRecommendations(gameList);
+
+      // Map recommendations back to full game objects
+      const gamesMap = new Map(uniqueGames.map(g => [g.appid, g]));
+      const recommendedGames = recommendations
+        .map(rec => gamesMap.get(rec.appid))
+        .filter((g): g is typeof uniqueGames[0] => g !== undefined);
+
+      return recommendedGames;
     }),
 });
 

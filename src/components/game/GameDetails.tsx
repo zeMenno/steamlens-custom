@@ -6,6 +6,7 @@ import { AIChatContent } from "../ai/AIChatContent";
 import { SimilarGamesContent } from "../ai/SimilarGamesContent";
 import { CollapsibleSection } from "../ui/CollapsibleSection";
 import { HowLongToBeat } from "./HowLongToBeat";
+import { GameInfoTabs } from "./GameInfoTabs";
 
 interface GameDetailsProps {
   appId: number;
@@ -34,6 +35,18 @@ interface GameDetailsProps {
       windows: boolean;
       mac: boolean;
       linux: boolean;
+    };
+    pc_requirements?: {
+      minimum?: string;
+      recommended?: string;
+    };
+    mac_requirements?: {
+      minimum?: string;
+      recommended?: string;
+    };
+    linux_requirements?: {
+      minimum?: string;
+      recommended?: string;
     };
     screenshots?: Array<{ id: number; path_thumbnail: string; path_full: string }>;
     movies?: Array<{ id: number; name: string; thumbnail: string; webm: { [key: string]: string } }>;
@@ -125,14 +138,14 @@ export function GameDetails({ appId, game }: GameDetailsProps) {
             </div>
           ) : null}
 
-          {/* Game Description */}
-          <div className="bg-gray-800 rounded-xl p-6 border border-gray-700">
-            <h2 className="text-xl font-bold text-white mb-4">About This Game</h2>
-            <div
-              className="text-gray-300 leading-relaxed prose prose-invert max-w-none"
-              dangerouslySetInnerHTML={{ __html: fullDescription }}
-            />
-          </div>
+          {/* Game Description and System Requirements Tabs */}
+          <GameInfoTabs
+            description={fullDescription}
+            pcRequirements={game.pc_requirements}
+            macRequirements={game.mac_requirements}
+            linuxRequirements={game.linux_requirements}
+            platforms={game.platforms}
+          />
         </div>
 
         {/* Right Column - Quick Info + AI Sections (1/4 width, sticky) */}
