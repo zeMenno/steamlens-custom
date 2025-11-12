@@ -7,7 +7,7 @@ import { GameDetails } from "~/components/game/GameDetails";
 export default function GamePage() {
   const params = useParams();
   const router = useRouter();
-  const appId = Number(params.id);
+  const appId = params?.id ? Number(params.id) : NaN;
 
   const { data: game, isLoading, error } = api.game.getGameDetails.useQuery(
     { appId },
