@@ -88,3 +88,13 @@ body {
   background: rgb(107 114 128);
 }
 
+/* Hide scrollbar for carousels */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+

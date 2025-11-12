@@ -699,3 +699,106 @@ export async function getGamesOnSale(filters?: SearchFilters): Promise<SteamGame
   }
 }
 
+/**
+ * Get games by price range
+ */
+export async function getGamesByPriceRange(
+  minPrice?: number,
+  maxPrice?: number,
+  filters?: SearchFilters
+): Promise<SteamGame[]> {
+  try {
+    // If minPrice is 0 and maxPrice is 0, it's free games
+    if (minPrice === 0 && maxPrice === 0) {
+      const freeFilters: SearchFilters = { ...filters, freeOnly: true };
+      // Try multiple search terms to get more free games
+      const searchTerms = ["free", "free to play", "f2p"];
+      const allGames: SteamGame[] = [];
+      
+      for (const term of searchTerms) {
+        try {
+          const results = await searchSteamGames(term, freeFilters);
+          allGames.push(...results);
+        } catch (e) {
+          // Continue with next term
+        }
+      }
+      
+      // Remove duplicates
+      const uniqueGames = Array.from(
+        new Map(allGames.map((game) => [game.appid, game])).values()
+      );
+      
+      return uniqueGames.slice(0, 100);
+    }
+
+    // Build search filters with price range
+    const priceFilters: SearchFilters = {
+      ...filters,
+      minPrice,
+      maxPrice,
+    };
+
+    // Use more diverse search terms to get better coverage
+    const searchTerms = [
+      "action",
+      "adventure",
+      "rpg",
+      "strategy",
+      "indie",
+      "simulation",
+      "sports",
+      "racing",
+      "puzzle",
+      "horror",
+      "shooter",
+      "platformer",
+    ];
+    const allGames: SteamGame[] = [];
+
+    // Search with multiple terms to get more games
+    for (const term of searchTerms) {
+      try {
+        const results = await searchSteamGames(term, priceFilters);
+        allGames.push(...results);
+        // Continue searching until we have a good pool
+        if (allGames.length >= 200) break;
+      } catch (e) {
+        // Continue with next term
+      }
+    }
+
+    // Remove duplicates
+    const uniqueGames = Array.from(
+      new Map(allGames.map((game) => [game.appid, game])).values()
+    );
+
+    // Filter by price range more strictly
+    const filteredGames = uniqueGames.filter((game) => {
+      if (game.isFree) {
+        return minPrice === 0 && maxPrice === 0;
+      }
+
+      if (!game.price) return false;
+
+      const priceNum = parseFloat(game.price.replace("$", ""));
+      
+      if (minPrice !== undefined && maxPrice !== undefined) {
+        return priceNum >= minPrice && priceNum <= maxPrice;
+      } else if (minPrice !== undefined) {
+        return priceNum >= minPrice;
+      } else if (maxPrice !== undefined) {
+        return priceNum <= maxPrice;
+      }
+
+      return true;
+    });
+
+    // Return up to 100 games instead of 30
+    return filteredGames.slice(0, 100);
+  } catch (error) {
+    console.error("Error fetching games by price range:", error);
+    return [];
+  }
+}
+

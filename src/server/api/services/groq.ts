@@ -236,3 +236,114 @@ Only use games from the provided list. Do NOT suggest "${gameData.name}". Return
   }
 }
 
+export async function getGeneralGameRecommendations(
+  availableGames: Array<{ appid: number; name: string }>
+): Promise<Array<{ appid: number; name: string; reason: string }>> {
+  try {
+    const gamesList = availableGames
+      .slice(0, 100) // Use more games for better recommendations
+      .map((g) => `${g.appid}: ${g.name}`)
+      .join("\n");
+
+    const prompt = `You are an expert game recommendation assistant. Analyze the following list of popular and trending games, and recommend 10 diverse, high-quality games that would appeal to a broad audience.
+
+Consider these factors when making recommendations:
+- Game quality and popularity
+- Genre diversity (mix of action, adventure, RPG, strategy, indie, etc.)
+- Different price points (free, budget, mid-range, premium)
+- Different gameplay styles and experiences
+- Games that are well-reviewed and well-regarded
+- A mix of recent releases and timeless classics
+
+Available Games (format: appid: name):
+${gamesList}
+
+Please return exactly 10 game recommendations in the following JSON format:
+{
+  "recommendations": [
+    {"appid": 123, "name": "Game Name", "reason": "Detailed explanation of why this game is recommended, considering quality, appeal, and what makes it special"},
+    ...
+  ]
+}
+
+Return only valid JSON, no additional text.`;
+
+    const groq = getGroqClient();
+    const completion = await groq.chat.completions.create({
+      messages: [
+        {
+          role: "system",
+          content: "You are a game recommendation assistant. Always return valid JSON only.",
+        },
+        {
+          role: "user",
+          content: prompt,
+        },
+      ],
+      model: "llama-3.1-8b-instant",
+      temperature: 0.7,
+      max_tokens: 2000,
+      response_format: { type: "json_object" },
+    });
+
+    const response = completion.choices[0]?.message?.content || "{}";
+    
+    try {
+      const parsed = JSON.parse(response);
+      const recommendations = parsed.recommendations || parsed.games || [];
+      
+      // Create a map of available games by appid and name for lookup
+      const gamesById = new Map(availableGames.map(g => [g.appid, g]));
+      const gamesByName = new Map(
+        availableGames.map(g => [g.name.toLowerCase().trim(), g])
+      );
+      
+      // Validate and match recommendations to actual games
+      const validRecommendations = recommendations
+        .slice(0, 15) // Get more to filter down
+        .map((rec: any) => {
+          const appid = typeof rec.appid === 'number' ? rec.appid : parseInt(rec.appid);
+          const name = (rec.name || rec.title || "").trim();
+          
+          // Try to find the game by appid first
+          let matchedGame = gamesById.get(appid);
+          
+          // If not found by ID, try to match by name
+          if (!matchedGame && name) {
+            matchedGame = gamesByName.get(name.toLowerCase());
+          }
+          
+          return matchedGame ? {
+            appid: matchedGame.appid,
+            name: matchedGame.name,
+            reason: rec.reason || rec.explanation || "Recommended game",
+          } : null;
+        })
+        .filter((rec: any): rec is { appid: number; name: string; reason: string } => 
+          rec !== null && 
+          rec.appid && 
+          rec.name
+        );
+      
+      // Remove duplicates and return top 10
+      const recMap = new Map<number, { appid: number; name: string; reason: string }>();
+      validRecommendations.forEach((r: { appid: number; name: string; reason: string }) => {
+        recMap.set(r.appid, r);
+      });
+      const uniqueRecs = Array.from(recMap.values());
+      
+      return uniqueRecs.slice(0, 10);
+    } catch (parseError) {
+      console.error("Error parsing AI response:", parseError);
+      // Fallback: return diverse games from the list
+      const shuffled = [...availableGames].sort(() => Math.random() - 0.5);
+      return shuffled.slice(0, 10).map((g) => ({ ...g, reason: "Popular choice" }));
+    }
+  } catch (error: any) {
+    console.error("Error getting general game recommendations from Groq:", error);
+    // Fallback: return diverse games from the list
+    const shuffled = [...availableGames].sort(() => Math.random() - 0.5);
+    return shuffled.slice(0, 10).map((g) => ({ ...g, reason: "Popular choice" }));
+  }
+}
+
